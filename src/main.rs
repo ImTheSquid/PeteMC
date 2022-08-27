@@ -1,4 +1,5 @@
 use std::env;
+use std::process::Command;
 use lazy_static::lazy_static;
 use microkv::MicroKV;
 use serenity::async_trait;
@@ -58,6 +59,38 @@ impl EventHandler for Handler {
                         format!(":white_check_mark: Address set to `{}`", address)
                     }
                 },
+                "start_server" => {
+                    let address = DB.get("address");
+                    let res = DB.get("start_cmd");
+
+                    if res.is_err() || res.as_ref().unwrap().is_none() || address.is_err() || address.as_ref().unwrap().is_none() {
+                        ":x: Start command is not configured".to_string()
+                    } else {
+                        let address: String = address.unwrap().unwrap();
+                        let cmd: String = res.unwrap().unwrap();
+                        let connection = async_minecraft_ping::connect(address.to_string()).await.unwrap();
+
+                        match connection.status().await {
+                            Ok(_) => ":white_check_mark: Server is already running".to_string(),
+                            Err(_) => {
+                                if let Err(e) = Command::new("sh").arg("-c").arg(cmd).output() {
+                                    format!(":x: Failed to execute command: {}", e.to_string())
+                                } else {
+                                    ":white_check_mark: Start command sent".to_string()
+                                }
+                            }
+                        }
+                    }
+                },
+                "set_start_cmd" => {
+                    let cmd = &command.data.options.get(0).unwrap().value.as_ref().unwrap().as_str().unwrap().to_string();
+
+                    if let Err(e) = DB.put("start_cmd", cmd) {
+                        format!(":x: Failed to set start command: {}", e.to_string())
+                    } else {
+                        format!(":white_check_mark: Start command set to `{}`", cmd)
+                    }
+                }
                 _ => "Invalid command!".to_string()
             };
 
@@ -104,6 +137,24 @@ impl EventHandler for Handler {
                             option
                                 .name("address")
                                 .description("The address")
+                                .kind(CommandOptionType::String)
+                                .required(true)
+                        })
+                        .default_member_permissions(Permissions::ADMINISTRATOR)
+                })
+                .create_application_command(|command| {
+                    command
+                        .name("start_server")
+                        .description("Starts the server if it isn't already running")  
+                })
+                .create_application_command(|command| {
+                    command
+                        .name("set_start_cmd")
+                        .description("Sets the start command")
+                        .create_option(|option| {
+                            option
+                                .name("command")
+                                .description("The command")
                                 .kind(CommandOptionType::String)
                                 .required(true)
                         })
