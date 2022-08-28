@@ -28,24 +28,27 @@ impl EventHandler for Handler {
                             DB.get_unwrap("address").unwrap()
                         };
 
-                        let connection = async_minecraft_ping::connect(address.clone()).await.unwrap();
-
-                        match connection.status().await {
-                            Ok(res) => if res.status.players.online > 0 {
-                                format!(
-                                    ":white_check_mark: Server `{}` is online with `{}/{}` players. Currently Online: `{}`", 
-                                    address,
-                                    res.status.players.online, 
-                                    res.status.players.max,
-                                    res.status.players.sample.unwrap_or(vec![]).into_iter().map(|player| player.name).collect::<Vec<_>>().join(", ")
-                                )
-                            } else {
-                                format!(
-                                    ":white_check_mark: Server `{}` is online with `0/{}` players.", 
-                                    address, 
-                                    res.status.players.max
-                                )
-                            },
+                        match async_minecraft_ping::connect(address.clone()).await {
+                            Ok(connection) => {
+                                match connection.status().await {
+                                    Ok(res) => if res.status.players.online > 0 {
+                                        format!(
+                                            ":white_check_mark: Server `{}` is online with `{}/{}` players. Currently Online: `{}`", 
+                                            address,
+                                            res.status.players.online, 
+                                            res.status.players.max,
+                                            res.status.players.sample.unwrap_or(vec![]).into_iter().map(|player| player.name).collect::<Vec<_>>().join(", ")
+                                        )
+                                    } else {
+                                        format!(
+                                            ":white_check_mark: Server `{}` is online with `0/{}` players.", 
+                                            address, 
+                                            res.status.players.max
+                                        )
+                                    },
+                                    Err(e) => format!(":x: Failed to fetch status: {}", e.to_string())
+                                }
+                            }
                             Err(e) => format!(":x: Failed to fetch status: {}", e.to_string())
                         }
                     }
@@ -68,17 +71,15 @@ impl EventHandler for Handler {
                     } else {
                         let address: String = address.unwrap().unwrap();
                         let cmd: String = res.unwrap().unwrap();
-                        let connection = async_minecraft_ping::connect(address.to_string()).await.unwrap();
 
-                        match connection.status().await {
-                            Ok(_) => ":white_check_mark: Server is already running".to_string(),
-                            Err(_) => {
-                                if let Err(e) = Command::new("sh").arg("-c").arg(cmd).output() {
-                                    format!(":x: Failed to execute command: {}", e.to_string())
-                                } else {
-                                    ":white_check_mark: Start command sent".to_string()
+                        match async_minecraft_ping::connect(address.clone()).await {
+                            Ok(connection) => {
+                                match connection.status().await {
+                                    Ok(_) => ":white_check_mark: Server is already running".to_string(),
+                                    Err(_) => start_server(&cmd)
                                 }
                             }
+                            Err(_) => start_server(&cmd)
                         }
                     }
                 },
@@ -161,6 +162,14 @@ impl EventHandler for Handler {
                         .default_member_permissions(Permissions::ADMINISTRATOR)
                 })
         }).await.unwrap();
+    }
+}
+
+fn start_server(cmd: &str) -> String {
+    if let Err(e) = Command::new("sh").arg("-c").arg(format!("\"{}\"", cmd)).output() {
+        format!(":x: Failed to execute command: {}", e.to_string())
+    } else {
+        ":white_check_mark: Start command sent".to_string()
     }
 }
 
