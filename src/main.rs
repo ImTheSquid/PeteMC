@@ -1,5 +1,7 @@
 use std::env;
 use std::process::Command;
+use std::time::Duration;
+use async_minecraft_ping::ConnectionConfig;
 use lazy_static::lazy_static;
 use microkv::MicroKV;
 use serenity::async_trait;
@@ -28,7 +30,7 @@ impl EventHandler for Handler {
                             DB.get_unwrap("address").unwrap()
                         };
 
-                        match async_minecraft_ping::connect(address.clone()).await {
+                        match get_connection(&address).connect().await {
                             Ok(connection) => {
                                 match connection.status().await {
                                     Ok(res) => if res.status.players.online > 0 {
@@ -72,7 +74,7 @@ impl EventHandler for Handler {
                         let address: String = address.unwrap().unwrap();
                         let cmd: String = res.unwrap().unwrap();
 
-                        match async_minecraft_ping::connect(address.clone()).await {
+                        match get_connection(&address).connect().await {
                             Ok(connection) => {
                                 match connection.status().await {
                                     Ok(_) => ":white_check_mark: Server is already running".to_string(),
@@ -171,6 +173,17 @@ fn start_server(cmd: &str) -> String {
     } else {
         ":white_check_mark: Start command sent".to_string()
     }
+}
+
+fn get_connection(address: &str) -> ConnectionConfig {
+    let split = address.split(":").collect::<Vec<_>>();
+    let mut config = async_minecraft_ping::ConnectionConfig::build(split[0]).with_timeout(Duration::from_millis(250));
+
+    if split.len() == 2 {
+        config = config.with_port(split[1].parse().unwrap_or(25565))
+    }
+
+    config
 }
 
 lazy_static! {
