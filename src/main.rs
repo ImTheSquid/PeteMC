@@ -1,7 +1,7 @@
 use std::env;
 use std::process::Command;
 use std::time::Duration;
-use async_minecraft_ping::ConnectionConfig;
+use async_minecraft_ping::{ConnectionConfig, StatusConnection, ServerError};
 use lazy_static::lazy_static;
 use microkv::MicroKV;
 use serenity::async_trait;
@@ -30,7 +30,7 @@ impl EventHandler for Handler {
                             DB.get_unwrap("address").unwrap()
                         };
 
-                        match get_connection(&address).connect().await {
+                        match get_connection(&address).await {
                             Ok(connection) => {
                                 match connection.status().await {
                                     Ok(res) => if res.status.players.online > 0 {
@@ -74,7 +74,7 @@ impl EventHandler for Handler {
                         let address: String = address.unwrap().unwrap();
                         let cmd: String = res.unwrap().unwrap();
 
-                        match get_connection(&address).connect().await {
+                        match get_connection(&address).await {
                             Ok(connection) => {
                                 match connection.status().await {
                                     Ok(_) => ":white_check_mark: Server is already running".to_string(),
@@ -175,15 +175,19 @@ fn start_server(cmd: &str) -> String {
     }
 }
 
-fn get_connection(address: &str) -> ConnectionConfig {
+async fn get_connection(address: &str) -> Result<StatusConnection, ServerError> {
+    const TIMEOUT: Duration = Duration::from_millis(250);
     let split = address.split(":").collect::<Vec<_>>();
-    let mut config = async_minecraft_ping::ConnectionConfig::build(split[0]).with_timeout(Duration::from_millis(250));
+    let mut config = async_minecraft_ping::ConnectionConfig::build(split[0]).with_timeout(TIMEOUT);
 
     if split.len() == 2 {
         config = config.with_port(split[1].parse().unwrap_or(25565))
     }
 
-    config
+    match tokio::time::timeout(TIMEOUT, config.connect()).await {
+        Ok(conn) => conn,
+        Err(_) => Err(ServerError::FailedToConnect)
+    }
 }
 
 lazy_static! {
