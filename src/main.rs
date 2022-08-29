@@ -168,7 +168,7 @@ impl EventHandler for Handler {
 }
 
 fn start_server(cmd: &str) -> String {
-    if let Err(e) = Command::new("sh").arg("-c").arg(format!("\"{}\"", cmd)).output() {
+    if let Err(e) = Command::new(cmd).output() {
         format!(":x: Failed to execute command: {}", e.to_string())
     } else {
         ":white_check_mark: Start command sent".to_string()
