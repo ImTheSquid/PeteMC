@@ -1,7 +1,7 @@
 use std::env;
 use std::process::Command;
 use std::time::Duration;
-use async_minecraft_ping::{ConnectionConfig, StatusConnection, ServerError};
+use async_minecraft_ping::{StatusConnection, ServerError};
 use lazy_static::lazy_static;
 use microkv::MicroKV;
 use serenity::async_trait;
